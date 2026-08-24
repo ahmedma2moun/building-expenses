@@ -66,7 +66,7 @@ const contributionSchema = z.object({
   budgetId: z.string().min(1),
   residentId: z.string().min(1),
   amount: z.coerce.number().positive(),
-  period: z.string().trim().min(1),
+  periods: z.array(z.string().trim().min(1)).min(1),
   paidDate: z.string().optional(),
   note: z.string().trim().optional(),
 });
@@ -76,20 +76,20 @@ export async function addContribution(formData: FormData) {
     budgetId: formData.get("budgetId"),
     residentId: formData.get("residentId"),
     amount: formData.get("amount"),
-    period: formData.get("period"),
+    periods: formData.getAll("period"),
     paidDate: formData.get("paidDate") || undefined,
     note: formData.get("note") || undefined,
   });
 
-  await prisma.contribution.create({
-    data: {
+  await prisma.contribution.createMany({
+    data: data.periods.map((period) => ({
       budgetId: data.budgetId,
       residentId: data.residentId,
       amount: data.amount,
-      period: data.period,
+      period,
       paidDate: data.paidDate ? new Date(data.paidDate) : new Date(),
       note: data.note,
-    },
+    })),
   });
 
   revalidatePath(`/budgets/${data.budgetId}`);

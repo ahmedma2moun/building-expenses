@@ -75,43 +75,63 @@ export default async function BudgetDetailPage({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs text-neutral-500">المبلغ</label>
-              <input
-                name="amount"
-                type="number"
-                step="0.01"
-                required
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base outline-none focus:border-neutral-900"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-neutral-500">
-                {budget.type === "MONTHLY" ? "الشهر" : "الدفعة / البيان"}
-              </label>
-              {budget.type === "MONTHLY" ? (
-                <select
-                  name="period"
+          {budget.type === "MONTHLY" ? (
+            <>
+              <div>
+                <label className="mb-1 block text-xs text-neutral-500">المبلغ لكل شهر</label>
+                <input
+                  name="amount"
+                  type="number"
+                  step="0.01"
                   required
                   className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base outline-none focus:border-neutral-900"
-                >
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-neutral-500">
+                  الأشهر (يمكن اختيار أكثر من شهر)
+                </label>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {monthOptions(budget.year ?? new Date().getFullYear()).map((m) => (
-                    <option key={m.value} value={m.value}>
+                    <label
+                      key={m.value}
+                      className="flex items-center gap-1.5 rounded-lg border border-neutral-300 px-2 py-2 text-sm has-[:checked]:border-neutral-900 has-[:checked]:bg-neutral-50"
+                    >
+                      <input
+                        type="checkbox"
+                        name="period"
+                        value={m.value}
+                        className="h-4 w-4 rounded border-neutral-300"
+                      />
                       {m.label}
-                    </option>
+                    </label>
                   ))}
-                </select>
-              ) : (
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-neutral-500">المبلغ</label>
+                <input
+                  name="amount"
+                  type="number"
+                  step="0.01"
+                  required
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base outline-none focus:border-neutral-900"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-neutral-500">الدفعة / البيان</label>
                 <input
                   name="period"
                   required
                   placeholder="مثال: الدفعة الأولى"
                   className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base outline-none focus:border-neutral-900"
                 />
-              )}
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label className="mb-1 block text-xs text-neutral-500">تاريخ الدفع</label>
