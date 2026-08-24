@@ -28,25 +28,47 @@ contributions/expenses rather than stored, so they're always consistent.
 
 ```bash
 npm install
-npx prisma migrate dev   # apply schema to DATABASE_URL
+npx prisma migrate dev   # apply schema, using DIRECT_URL
 npm run db:seed          # optional: load the historical 2025/2026 sheet data
 npm run dev
 ```
 
-Copy `.env.example` to `.env` and fill in `DATABASE_URL` (Supabase connection
-string) and `ADMIN_PASSWORD` (the shared password that gates the whole app).
+Copy `.env.example` to `.env` and fill in `DATABASE_URL`, `DIRECT_URL`, and
+`ADMIN_PASSWORD` (the shared password that gates the whole app).
+
+### Why two database URLs
+
+Supabase (and most managed Postgres) offers two pooler endpoints:
+
+- **Transaction pooler** (port `6543`, `?pgbouncer=true`) — multiplexes many
+  short-lived connections into few real Postgres connections. Required for
+  serverless (Vercel): every function invocation opens its own connection,
+  and a session-mode pooler's small connection cap (e.g. 15) gets exhausted
+  almost immediately otherwise. **This is what `DATABASE_URL` must point
+  to** — it's what the running app uses (`src/lib/prisma.ts`).
+- **Session/direct connection** (port `5432`) — needed for migrations,
+  which rely on session-level features (advisory locks) the transaction
+  pooler doesn't support. **This is what `DIRECT_URL` must point to** —
+  it's used only by the Prisma CLI (`prisma.config.ts`), for `migrate dev`
+  / `migrate deploy` / `db pull`.
+
+Using the transaction pooler for migrations (or vice versa) causes
+`prisma migrate` to hang indefinitely rather than fail — if that happens,
+double check which URL is set to which port.
 
 ## Deploying to Vercel
 
 1. Push this repo to GitHub.
 2. In Vercel, "Add New Project" → import the GitHub repo.
 3. Set environment variables in the Vercel project settings:
-   - `DATABASE_URL` — the Supabase connection string
+   - `DATABASE_URL` — Supabase transaction pooler, port `6543`,
+     `?pgbouncer=true` appended
+   - `DIRECT_URL` — Supabase session/direct connection, port `5432`
    - `ADMIN_PASSWORD` — a real password (not the local dev one)
-4. Deploy. `prisma generate` runs automatically via the `postinstall` script.
-5. Run `npx prisma migrate deploy` once (locally, pointed at the prod
-   `DATABASE_URL`, or via a Vercel deploy hook) to apply schema changes to
-   the production database — `migrate dev` is for local development only.
+4. Deploy. `prisma generate` runs via `postinstall`, and `prisma migrate
+   deploy` runs automatically as part of `npm run build` before `next
+   build` — so every deploy applies any pending migrations to `DIRECT_URL`
+   first.
 
 ## Notes on the migrated sheet data
 

@@ -8,7 +8,12 @@ export default defineConfig({
   migrations: {
     path: "prisma/migrations",
   },
+  // The Prisma CLI (migrate/db pull) needs a session-capable connection,
+  // which a transaction-mode pooler (used at app runtime, see
+  // src/lib/prisma.ts) doesn't support. This intentionally reads DIRECT_URL,
+  // not DATABASE_URL — this version of prisma.config.ts has no separate
+  // `directUrl` field, so the CLI's one `url` must be the direct connection.
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: process.env["DIRECT_URL"],
   },
 });
