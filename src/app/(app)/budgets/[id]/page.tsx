@@ -213,34 +213,101 @@ export default async function BudgetDetailPage({
 
       <section>
         <h2 className="mb-3 text-sm font-semibold">المصروفات ({budget.expenses.length})</h2>
-        <div className="space-y-2">
-          {budget.expenses.length === 0 && (
-            <p className="text-sm text-neutral-400">لا توجد مصروفات بعد</p>
-          )}
-          {budget.expenses.map((e) => (
-            <div
-              key={e.id}
-              className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 py-2.5"
-            >
-              <div>
-                <p className="text-sm font-medium text-neutral-900">{e.item}</p>
-                <p className="text-xs text-neutral-500">
-                  {new Date(e.date).toLocaleDateString("ar-EG")}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-neutral-900">{money(Number(e.amount))}</span>
-                <form action={deleteExpenseWithId.bind(null, e.id, budget.id)}>
-                  <button type="submit" className="text-xs text-red-500">
-                    حذف
-                  </button>
-                </form>
-              </div>
+
+        {budget.expenses.length === 0 && (
+          <p className="text-sm text-neutral-400">لا توجد مصروفات بعد</p>
+        )}
+
+        {budget.monthlyBreakdown ? (
+          <div className="space-y-3">
+            {budget.monthlyBreakdown
+              .filter((m) => m.collected > 0 || m.spent > 0)
+              .map((m) => (
+                <div
+                  key={m.period}
+                  className="overflow-hidden rounded-xl border border-neutral-200 bg-white"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-neutral-50 px-3 py-2">
+                    <span className="text-sm font-semibold text-neutral-900">{m.label}</span>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-neutral-500">
+                      <span>محصل {money(m.collected)}</span>
+                      <span>مصروف {money(m.spent)}</span>
+                      <span
+                        className={`font-semibold ${
+                          m.remaining < 0 ? "text-red-600" : "text-neutral-900"
+                        }`}
+                      >
+                        متبقي {money(m.remaining)}
+                      </span>
+                    </div>
+                  </div>
+                  {m.expenses.length > 0 && (
+                    <ExpenseTable
+                      expenses={m.expenses}
+                      onDelete={(expenseId) => deleteExpenseWithId.bind(null, expenseId, budget.id)}
+                    />
+                  )}
+                </div>
+              ))}
+          </div>
+        ) : (
+          budget.expenses.length > 0 && (
+            <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
+              <ExpenseTable
+                expenses={budget.expenses}
+                onDelete={(expenseId) => deleteExpenseWithId.bind(null, expenseId, budget.id)}
+                showHeader
+              />
             </div>
-          ))}
-        </div>
+          )
+        )}
       </section>
     </div>
+  );
+}
+
+function ExpenseTable({
+  expenses,
+  onDelete,
+  showHeader,
+}: {
+  expenses: { id: string; item: string; amount: unknown; date: Date }[];
+  onDelete: (id: string) => (formData: FormData) => Promise<void>;
+  showHeader?: boolean;
+}) {
+  return (
+    <table className="w-full text-sm">
+      {showHeader && (
+        <thead>
+          <tr className="border-b border-neutral-200 text-right text-[11px] text-neutral-500">
+            <th className="px-3 py-2 font-medium">البند</th>
+            <th className="px-3 py-2 font-medium">التاريخ</th>
+            <th className="px-3 py-2 font-medium">المبلغ</th>
+            <th className="px-2 py-2" />
+          </tr>
+        </thead>
+      )}
+      <tbody>
+        {expenses.map((e) => (
+          <tr key={e.id} className="border-t border-neutral-100 first:border-t-0">
+            <td className="px-3 py-2 text-neutral-900">{e.item}</td>
+            <td className="whitespace-nowrap px-3 py-2 text-xs text-neutral-500">
+              {new Date(e.date).toLocaleDateString("ar-EG")}
+            </td>
+            <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-neutral-900">
+              {money(Number(e.amount))}
+            </td>
+            <td className="px-2 py-2 text-left">
+              <form action={onDelete(e.id)}>
+                <button type="submit" className="text-xs text-red-500">
+                  حذف
+                </button>
+              </form>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

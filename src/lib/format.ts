@@ -2,7 +2,7 @@ export function money(amount: number) {
   return `${amount.toLocaleString("ar-EG", { maximumFractionDigits: 2 })} ج.م`;
 }
 
-const MONTH_NAMES: Record<string, string> = {
+export const MONTH_NAMES: Record<string, string> = {
   "01": "يناير",
   "02": "فبراير",
   "03": "مارس",
