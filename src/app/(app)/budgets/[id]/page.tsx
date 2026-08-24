@@ -1,14 +1,8 @@
 import { notFound } from "next/navigation";
 import { getBudgetDetail } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
-import { money, monthOptions, periodLabel } from "@/lib/format";
-import {
-  addContribution,
-  addExpense,
-  deleteContribution,
-  deleteExpense,
-  toggleBudgetClosed,
-} from "@/app/actions";
+import { money, monthOptions } from "@/lib/format";
+import { addContribution, addExpense, deleteExpense, toggleBudgetClosed } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +20,6 @@ export default async function BudgetDetailPage({
     orderBy: { name: "asc" },
   });
 
-  const deleteContributionWithId = deleteContribution.bind(null);
   const deleteExpenseWithId = deleteExpense.bind(null);
   const toggleClosed = toggleBudgetClosed.bind(null, budget.id, !budget.closed);
 
@@ -184,31 +177,12 @@ export default async function BudgetDetailPage({
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold">الدفعات ({budget.contributions.length})</h2>
-        <div className="space-y-2">
-          {budget.contributions.length === 0 && (
-            <p className="text-sm text-neutral-400">لا توجد دفعات بعد</p>
-          )}
-          {budget.contributions.map((c) => (
-            <div
-              key={c.id}
-              className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 py-2.5"
-            >
-              <div>
-                <p className="text-sm font-medium text-neutral-900">{c.resident.name}</p>
-                <p className="text-xs text-neutral-500">{periodLabel(c.period)}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-neutral-900">{money(Number(c.amount))}</span>
-                <form action={deleteContributionWithId.bind(null, c.id, budget.id)}>
-                  <button type="submit" className="text-xs text-red-500">
-                    حذف
-                  </button>
-                </form>
-              </div>
-            </div>
-          ))}
-        </div>
+        <h2 className="mb-3 text-sm font-semibold">جدول المساهمات</h2>
+        {budget.contributionGrid.type === "MONTHLY" ? (
+          <MonthlyGrid grid={budget.contributionGrid} />
+        ) : (
+          <PeriodGrid grid={budget.contributionGrid} />
+        )}
       </section>
 
       <section>
@@ -308,6 +282,167 @@ function ExpenseTable({
         ))}
       </tbody>
     </table>
+  );
+}
+
+function num(amount: number) {
+  return amount.toLocaleString("ar-EG");
+}
+
+type GridResident = { id: string; name: string; isResident: boolean };
+
+function MonthlyGrid({
+  grid,
+}: {
+  grid: {
+    residents: GridResident[];
+    months: {
+      period: string;
+      label: string;
+      cells: Record<string, number>;
+      total: number;
+      isPastOrCurrent: boolean;
+    }[];
+    residentTotals: Record<string, number>;
+    grandTotal: number;
+  };
+}) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+      <table className="w-full border-collapse text-xs">
+        <thead>
+          <tr>
+            <th className="sticky right-0 z-10 whitespace-nowrap bg-neutral-50 px-2 py-2 text-right font-medium text-neutral-500">
+              الشهر
+            </th>
+            {grid.residents.map((r) => (
+              <th
+                key={r.id}
+                className="whitespace-nowrap px-2 py-2 text-center font-medium text-neutral-500"
+              >
+                {r.name}
+              </th>
+            ))}
+            <th className="whitespace-nowrap bg-neutral-50 px-2 py-2 text-center font-semibold text-neutral-700">
+              الإجمالي
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {grid.months.map((m) => (
+            <tr key={m.period} className="border-t border-neutral-100">
+              <td className="sticky right-0 z-10 whitespace-nowrap bg-white px-2 py-1.5 font-medium text-neutral-900">
+                {m.label}
+              </td>
+              {grid.residents.map((r) => {
+                const amount = m.cells[r.id] ?? 0;
+                const missing = m.isPastOrCurrent && r.isResident && amount === 0;
+                return (
+                  <td
+                    key={r.id}
+                    className={`whitespace-nowrap px-2 py-1.5 text-center ${
+                      missing
+                        ? "bg-red-50 font-semibold text-red-600"
+                        : amount > 0
+                          ? "text-neutral-700"
+                          : "text-neutral-300"
+                    }`}
+                  >
+                    {amount > 0 ? num(amount) : missing ? "لم يدفع" : "—"}
+                  </td>
+                );
+              })}
+              <td className="whitespace-nowrap bg-neutral-50 px-2 py-1.5 text-center font-semibold text-neutral-900">
+                {num(m.total)}
+              </td>
+            </tr>
+          ))}
+          <tr className="border-t-2 border-neutral-300 bg-neutral-50 font-semibold text-neutral-900">
+            <td className="sticky right-0 z-10 whitespace-nowrap bg-neutral-50 px-2 py-2">
+              الإجمالي
+            </td>
+            {grid.residents.map((r) => (
+              <td key={r.id} className="whitespace-nowrap px-2 py-2 text-center">
+                {num(grid.residentTotals[r.id] ?? 0)}
+              </td>
+            ))}
+            <td className="whitespace-nowrap px-2 py-2 text-center">{num(grid.grandTotal)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PeriodGrid({
+  grid,
+}: {
+  grid: {
+    residents: GridResident[];
+    rows: { period: string; cells: Record<string, number>; total: number }[];
+    residentTotals: Record<string, number>;
+    grandTotal: number;
+  };
+}) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+      <table className="w-full border-collapse text-xs">
+        <thead>
+          <tr>
+            <th className="sticky right-0 z-10 whitespace-nowrap bg-neutral-50 px-2 py-2 text-right font-medium text-neutral-500">
+              الدفعة
+            </th>
+            {grid.residents.map((r) => (
+              <th
+                key={r.id}
+                className="whitespace-nowrap px-2 py-2 text-center font-medium text-neutral-500"
+              >
+                {r.name}
+              </th>
+            ))}
+            <th className="whitespace-nowrap bg-neutral-50 px-2 py-2 text-center font-semibold text-neutral-700">
+              الإجمالي
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {grid.rows.map((row) => (
+            <tr key={row.period} className="border-t border-neutral-100">
+              <td className="sticky right-0 z-10 whitespace-nowrap bg-white px-2 py-1.5 font-medium text-neutral-900">
+                {row.period}
+              </td>
+              {grid.residents.map((r) => {
+                const amount = row.cells[r.id] ?? 0;
+                return (
+                  <td
+                    key={r.id}
+                    className={`whitespace-nowrap px-2 py-1.5 text-center ${
+                      amount > 0 ? "text-neutral-700" : "text-neutral-300"
+                    }`}
+                  >
+                    {amount > 0 ? num(amount) : "—"}
+                  </td>
+                );
+              })}
+              <td className="whitespace-nowrap bg-neutral-50 px-2 py-1.5 text-center font-semibold text-neutral-900">
+                {num(row.total)}
+              </td>
+            </tr>
+          ))}
+          <tr className="border-t-2 border-neutral-300 bg-neutral-50 font-semibold text-neutral-900">
+            <td className="sticky right-0 z-10 whitespace-nowrap bg-neutral-50 px-2 py-2">
+              الإجمالي
+            </td>
+            {grid.residents.map((r) => (
+              <td key={r.id} className="whitespace-nowrap px-2 py-2 text-center">
+                {num(grid.residentTotals[r.id] ?? 0)}
+              </td>
+            ))}
+            <td className="whitespace-nowrap px-2 py-2 text-center">{num(grid.grandTotal)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   );
 }
 

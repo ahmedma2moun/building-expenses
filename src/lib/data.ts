@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { MONTH_NAMES } from "@/lib/format";
+import { MONTH_NAMES, MONTH_ORDER } from "@/lib/format";
 
 export function toNumber(value: { toNumber: () => number } | number) {
   return typeof value === "number" ? value : value.toNumber();
@@ -42,12 +42,100 @@ export async function getBudgetDetail(id: string) {
       ? buildMonthlyBreakdown(budget.year, budget.contributions, budget.expenses)
       : null;
 
+  const allResidents = await prisma.resident.findMany({
+    orderBy: [{ isResident: "desc" }, { name: "asc" }],
+  });
+  const contributedResidentIds = new Set(budget.contributions.map((c) => c.residentId));
+  const gridResidents = allResidents.filter((r) => !r.archived || contributedResidentIds.has(r.id));
+
+  const contributionGrid =
+    budget.type === "MONTHLY" && budget.year
+      ? buildMonthlyGrid(budget.year, gridResidents, budget.contributions)
+      : buildPeriodGrid(gridResidents, budget.contributions);
+
   return {
     ...summarize(budget),
     contributions: budget.contributions,
     expenses: budget.expenses,
     monthlyBreakdown,
+    contributionGrid,
   };
+}
+
+type GridResident = { id: string; name: string; isResident: boolean; archived: boolean };
+
+function buildMonthlyGrid(
+  year: number,
+  residents: GridResident[],
+  contributions: { residentId: string; period: string; amount: { toNumber: () => number } }[],
+) {
+  const now = new Date();
+  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  const months = MONTH_ORDER.map((monthNum) => {
+    const period = `${year}-${monthNum}`;
+    const cells: Record<string, number> = {};
+    for (const r of residents) cells[r.id] = 0;
+    let total = 0;
+    for (const c of contributions) {
+      if (c.period !== period) continue;
+      cells[c.residentId] = (cells[c.residentId] ?? 0) + toNumber(c.amount);
+      total += toNumber(c.amount);
+    }
+    return { period, label: MONTH_NAMES[monthNum], cells, total, isPastOrCurrent: period <= currentPeriod };
+  });
+
+  const residentTotals: Record<string, number> = {};
+  for (const r of residents) residentTotals[r.id] = 0;
+  let grandTotal = 0;
+  for (const c of contributions) {
+    residentTotals[c.residentId] = (residentTotals[c.residentId] ?? 0) + toNumber(c.amount);
+    grandTotal += toNumber(c.amount);
+  }
+
+  return { type: "MONTHLY" as const, residents, months, residentTotals, grandTotal };
+}
+
+function buildPeriodGrid(
+  residents: GridResident[],
+  contributions: {
+    residentId: string;
+    period: string;
+    amount: { toNumber: () => number };
+    createdAt: Date;
+  }[],
+) {
+  const periodFirstSeen = new Map<string, number>();
+  for (const c of contributions) {
+    const seenAt = c.createdAt.getTime();
+    const existing = periodFirstSeen.get(c.period);
+    if (existing === undefined || seenAt < existing) periodFirstSeen.set(c.period, seenAt);
+  }
+  const periods = [...periodFirstSeen.keys()].sort(
+    (a, b) => periodFirstSeen.get(a)! - periodFirstSeen.get(b)!,
+  );
+
+  const rows = periods.map((period) => {
+    const cells: Record<string, number> = {};
+    for (const r of residents) cells[r.id] = 0;
+    let total = 0;
+    for (const c of contributions) {
+      if (c.period !== period) continue;
+      cells[c.residentId] = (cells[c.residentId] ?? 0) + toNumber(c.amount);
+      total += toNumber(c.amount);
+    }
+    return { period, cells, total };
+  });
+
+  const residentTotals: Record<string, number> = {};
+  for (const r of residents) residentTotals[r.id] = 0;
+  let grandTotal = 0;
+  for (const c of contributions) {
+    residentTotals[c.residentId] = (residentTotals[c.residentId] ?? 0) + toNumber(c.amount);
+    grandTotal += toNumber(c.amount);
+  }
+
+  return { type: "GENERAL" as const, residents, rows, residentTotals, grandTotal };
 }
 
 function buildMonthlyBreakdown(
@@ -55,7 +143,7 @@ function buildMonthlyBreakdown(
   contributions: { amount: { toNumber: () => number }; period: string }[],
   expenses: { id: string; item: string; amount: { toNumber: () => number }; date: Date }[],
 ) {
-  return Object.keys(MONTH_NAMES).map((monthNum) => {
+  return MONTH_ORDER.map((monthNum) => {
     const period = `${year}-${monthNum}`;
     const monthExpenses = expenses.filter((e) => expenseMonthKey(e.date) === period);
     const collected = contributions
