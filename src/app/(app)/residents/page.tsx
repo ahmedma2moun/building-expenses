@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { createResident, toggleResidentArchived } from "@/app/actions";
+import { createResident } from "@/app/actions";
+import { ResidentRow } from "@/components/resident-row";
 
 export const dynamic = "force-dynamic";
 
@@ -13,30 +14,9 @@ export default async function ResidentsPage() {
       <section>
         <h1 className="text-lg font-bold">السكان والملاك</h1>
         <div className="mt-4 space-y-2">
-          {residents.map((r) => {
-            const toggle = toggleResidentArchived.bind(null, r.id, !r.archived);
-            return (
-              <div
-                key={r.id}
-                className={`flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 py-3 ${
-                  r.archived ? "opacity-50" : ""
-                }`}
-              >
-                <div>
-                  <p className="font-medium text-neutral-900">{r.name}</p>
-                  <p className="text-xs text-neutral-500">
-                    {r.isResident ? "مقيم" : "غير مقيم"}
-                    {r.note ? ` · ${r.note}` : ""}
-                  </p>
-                </div>
-                <form action={toggle}>
-                  <button type="submit" className="text-xs text-neutral-500">
-                    {r.archived ? "إعادة تفعيل" : "أرشفة"}
-                  </button>
-                </form>
-              </div>
-            );
-          })}
+          {residents.map((r) => (
+            <ResidentRow key={r.id} resident={r} />
+          ))}
         </div>
       </section>
 

@@ -27,6 +27,16 @@ export async function toggleResidentArchived(id: string, archived: boolean) {
   revalidatePath("/residents");
 }
 
+export async function updateResident(id: string, formData: FormData) {
+  const data = residentSchema.omit({ note: true }).parse({
+    name: formData.get("name"),
+    isResident: formData.get("isResident") === "on",
+  });
+
+  await prisma.resident.update({ where: { id }, data });
+  revalidatePath("/residents");
+}
+
 const budgetSchema = z.object({
   name: z.string().trim().min(1),
   type: z.enum(["MONTHLY", "GENERAL"]),
