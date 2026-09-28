@@ -13,8 +13,39 @@ export default async function DashboardPage() {
   const totalCollected = budgets.reduce((s, b) => s + b.collected, 0);
   const totalSpent = budgets.reduce((s, b) => s + b.spent, 0);
 
+  const monthlyAvailable = monthly.reduce((s, b) => s + b.balance, 0);
+  const generalAvailable = general.reduce((s, b) => s + b.balance, 0);
+  const totalAvailable = monthlyAvailable + generalAvailable;
+
   return (
     <div className="space-y-8">
+      <section className="rounded-2xl bg-neutral-900 p-4 text-white">
+        <p className="text-xs text-neutral-400">إجمالي الرصيد المتاح</p>
+        <p
+          className={`mt-1 text-2xl font-bold ${totalAvailable < 0 ? "text-red-400" : "text-white"}`}
+        >
+          {money(totalAvailable)}
+        </p>
+        <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-neutral-700 pt-3 text-xs">
+          <div>
+            <dt className="text-neutral-400">الميزانيات الشهرية</dt>
+            <dd
+              className={`mt-0.5 font-semibold ${monthlyAvailable < 0 ? "text-red-400" : "text-white"}`}
+            >
+              {money(monthlyAvailable)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-neutral-400">الصناديق العامة</dt>
+            <dd
+              className={`mt-0.5 font-semibold ${generalAvailable < 0 ? "text-red-400" : "text-white"}`}
+            >
+              {money(generalAvailable)}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
       <section className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl border border-neutral-200 bg-white p-4">
           <p className="text-xs text-neutral-500">إجمالي المحصل</p>
